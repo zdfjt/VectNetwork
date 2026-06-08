@@ -4,7 +4,6 @@ import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { TradePanel } from "@/components/trade-panel"
 import { OrdersPanel } from "@/components/orders-panel"
-import { LiveFeed } from "@/components/live-feed"
 
 type View = "trade" | "orders"
 
@@ -42,21 +41,15 @@ export function Workspace() {
       </nav>
 
       {view === "trade" ? (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
-          <section className="lg:h-[640px]">
+        <div className="mx-auto max-w-md">
+          <section>
             <TradePanel />
-          </section>
-          <section className="h-[640px]">
-            <LiveFeed />
           </section>
         </div>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
-          <section className="h-[640px]">
+        <div>
+          <section className="min-h-[640px]">
             <OrdersPanel />
-          </section>
-          <section className="hidden h-[640px] lg:block">
-            <LiveFeed />
           </section>
         </div>
       )}
