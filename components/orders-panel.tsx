@@ -30,7 +30,7 @@ import type { TokenSymbol } from "@/lib/propamm-types"
 
 type FillStage = "review" | "signing" | "done"
 type AssetFilter = TokenSymbol | "ALL"
-type InstrumentFilter = "all" | "token" | "option"
+type OrderScope = "token" | "option"
 
 function useCountdown(target: number) {
   const [now, setNow] = useState(() => Date.now())
@@ -315,23 +315,22 @@ function OrderDetailDialog({
   )
 }
 
-export function OrdersPanel() {
+export function OrdersPanel({ scope = "token" }: { scope?: OrderScope }) {
   const [orders, setOrders] = useState<OpenOrder[]>([])
   const [assetFilter, setAssetFilter] = useState<AssetFilter>("ALL")
-  const [instrumentFilter, setInstrumentFilter] = useState<InstrumentFilter>("all")
   const [active, setActive] = useState<OpenOrder | null>(null)
 
   useEffect(() => {
-    setOrders(generateOpenOrders(14))
+    setOrders(generateOpenOrders(18))
   }, [])
 
   const filtered = useMemo(() => {
     return orders.filter((o) => {
+      if (o.instrument !== scope) return false
       if (assetFilter !== "ALL" && o.asset !== assetFilter) return false
-      if (instrumentFilter !== "all" && o.instrument !== instrumentFilter) return false
       return true
     })
-  }, [orders, assetFilter, instrumentFilter])
+  }, [orders, assetFilter, scope])
 
   const handleFilled = (id: string) => {
     setOrders((prev) => prev.filter((o) => o.id !== id))
@@ -340,29 +339,12 @@ export function OrdersPanel() {
   return (
     <div className="flex h-full flex-col rounded-xl border border-border bg-card p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-medium text-foreground">Open Orders</h2>
+        <h2 className="text-sm font-medium text-foreground">
+          {scope === "option" ? "Option Orders" : "Token Orders"}
+        </h2>
         <span className="font-mono text-xs text-muted-foreground">
           {filtered.length} fillable
         </span>
-      </div>
-
-      {/* Instrument filter */}
-      <div className="mb-2 grid grid-cols-3 gap-1.5 rounded-xl border border-border bg-secondary/40 p-1">
-        {(["all", "token", "option"] as InstrumentFilter[]).map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => setInstrumentFilter(f)}
-            className={cn(
-              "rounded-lg py-1.5 text-xs font-medium capitalize transition-colors",
-              instrumentFilter === f
-                ? "bg-sky-500/15 text-sky-400"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {f === "all" ? "All types" : f}
-          </button>
-        ))}
       </div>
 
       {/* Asset filter */}

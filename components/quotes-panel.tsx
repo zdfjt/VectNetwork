@@ -34,7 +34,7 @@ import type { TokenSymbol } from "@/lib/propamm-types"
 
 type QuoteStage = "draft" | "submitting" | "done"
 type AssetFilter = TokenSymbol | "ALL"
-type InstrumentFilter = "all" | "token" | "option"
+type QuoteScope = "token" | "option"
 
 function useCountdown(target: number) {
   const [now, setNow] = useState(() => Date.now())
@@ -329,23 +329,22 @@ function QuoteDialog({
   )
 }
 
-export function QuotesPanel() {
+export function QuotesPanel({ scope = "token" }: { scope?: QuoteScope }) {
   const [rfqs, setRfqs] = useState<Rfq[]>([])
   const [assetFilter, setAssetFilter] = useState<AssetFilter>("ALL")
-  const [instrumentFilter, setInstrumentFilter] = useState<InstrumentFilter>("all")
   const [active, setActive] = useState<Rfq | null>(null)
 
   useEffect(() => {
-    setRfqs(generateRfqs(14))
+    setRfqs(generateRfqs(18))
   }, [])
 
   const filtered = useMemo(() => {
     return rfqs.filter((r) => {
+      if (r.instrument !== scope) return false
       if (assetFilter !== "ALL" && r.asset !== assetFilter) return false
-      if (instrumentFilter !== "all" && r.instrument !== instrumentFilter) return false
       return true
     })
-  }, [rfqs, assetFilter, instrumentFilter])
+  }, [rfqs, assetFilter, scope])
 
   const handleQuoted = (id: string) => {
     setRfqs((prev) => prev.filter((r) => r.id !== id))
@@ -354,29 +353,12 @@ export function QuotesPanel() {
   return (
     <div className="flex h-full flex-col rounded-xl border border-border bg-card p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-medium text-foreground">Open Quotes</h2>
+        <h2 className="text-sm font-medium text-foreground">
+          {scope === "option" ? "Option Quotes" : "Token Quotes"}
+        </h2>
         <span className="font-mono text-xs text-muted-foreground">
           {filtered.length} active RFQs
         </span>
-      </div>
-
-      {/* Instrument filter */}
-      <div className="mb-2 grid grid-cols-3 gap-1.5 rounded-xl border border-border bg-secondary/40 p-1">
-        {(["all", "token", "option"] as InstrumentFilter[]).map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => setInstrumentFilter(f)}
-            className={cn(
-              "rounded-lg py-1.5 text-xs font-medium capitalize transition-colors",
-              instrumentFilter === f
-                ? "bg-sky-500/15 text-sky-400"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {f === "all" ? "All types" : f}
-          </button>
-        ))}
       </div>
 
       {/* Asset filter */}
