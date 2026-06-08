@@ -1,10 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { ArrowLeftRight, Coins, Layers } from "lucide-react"
+import { ArrowLeftRight, Coins, Layers, MessageSquare } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Workspace } from "@/components/workspace"
+import { ChatProvider, useChat } from "@/components/chat/chat-context"
+import { ChatSidebar } from "@/components/chat/chat-sidebar"
 
 export type Category = "spot" | "options" | "lending"
 
@@ -14,7 +16,35 @@ const CATEGORIES: { id: Category; label: string; icon: typeof Coins }[] = [
   { id: "lending", label: "Lending", icon: Coins },
 ]
 
+function ChatButton() {
+  const { openSidebar, conversations } = useChat()
+  return (
+    <button
+      type="button"
+      onClick={openSidebar}
+      className="relative rounded-lg border border-border bg-secondary/60 p-2 text-foreground transition-colors hover:bg-secondary"
+      aria-label="Open messages"
+    >
+      <MessageSquare className="size-4" />
+      {conversations.length > 0 && (
+        <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-sky-500 text-[10px] font-bold text-sky-950">
+          {conversations.length}
+        </span>
+      )}
+    </button>
+  )
+}
+
 export function AppShell() {
+  return (
+    <ChatProvider>
+      <AppShellInner />
+      <ChatSidebar />
+    </ChatProvider>
+  )
+}
+
+function AppShellInner() {
   const [category, setCategory] = useState<Category>("spot")
 
   return (
@@ -58,6 +88,7 @@ export function AppShell() {
           </nav>
 
           <div className="flex items-center gap-3">
+            <ChatButton />
             <button
               type="button"
               className="rounded-lg border border-border bg-secondary/60 px-3 py-1.5 font-mono text-xs text-foreground transition-colors hover:bg-secondary"

@@ -9,6 +9,7 @@ import {
   Clock,
   Layers,
   Loader2,
+  MessageSquare,
   Send,
   TrendingDown,
   TrendingUp,
@@ -24,13 +25,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { formatUsd, formatAmount } from "@/lib/quotes"
-import {
-  generateRfqs,
-  RFQ_ASSETS,
-  suggestUnitPrice,
-  type Rfq,
-} from "@/lib/rfqs"
+import { generateRfqs, RFQ_ASSETS, suggestUnitPrice, type Rfq } from "@/lib/rfqs"
 import type { TokenSymbol } from "@/lib/propamm-types"
+import { useChat } from "@/components/chat/chat-context"
 
 type QuoteStage = "draft" | "submitting" | "done"
 type AssetFilter = TokenSymbol | "ALL"
@@ -72,22 +69,34 @@ function SideBadge({ side }: { side: Rfq["side"] }) {
   )
 }
 
-function RfqCard({ rfq, onClick }: { rfq: Rfq; onClick: () => void }) {
+function RfqCard({
+  rfq,
+  onClick,
+  onChat,
+}: {
+  rfq: Rfq
+  onClick: () => void
+  onChat: () => void
+}) {
   const { expired, label } = useCountdown(rfq.rfqExpiry)
   const isOption = rfq.instrument === "option"
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={expired}
+    <div
       className={cn(
         "flex w-full flex-col gap-3 rounded-xl border border-border bg-secondary/40 p-4 text-left transition-colors",
-        expired
-          ? "cursor-not-allowed opacity-40"
-          : "hover:border-sky-500/40 hover:bg-secondary",
+        expired ? "opacity-40" : "hover:border-sky-500/40 hover:bg-secondary",
       )}
     >
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={expired}
+        className={cn(
+          "flex flex-col gap-3 text-left",
+          expired ? "cursor-not-allowed" : "cursor-pointer",
+        )}
+      >
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2.5">
           <div
@@ -171,7 +180,35 @@ function RfqCard({ rfq, onClick }: { rfq: Rfq; onClick: () => void }) {
           </span>
         )}
       </div>
-    </button>
+      </button>
+
+      {/* Action row */}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={onClick}
+          disabled={expired}
+          className={cn(
+            "flex-1 rounded-lg bg-sky-500 py-2 text-xs font-semibold text-sky-950 transition-colors hover:bg-sky-400",
+            expired && "cursor-not-allowed opacity-50",
+          )}
+        >
+          Submit quote
+        </button>
+        <button
+          type="button"
+          onClick={onChat}
+          disabled={expired}
+          className={cn(
+            "flex items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-secondary",
+            expired && "cursor-not-allowed opacity-50",
+          )}
+        >
+          <MessageSquare className="size-3.5" />
+          Chat with maker
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -333,6 +370,7 @@ export function QuotesPanel({ scope = "token" }: { scope?: QuoteScope }) {
   const [rfqs, setRfqs] = useState<Rfq[]>([])
   const [assetFilter, setAssetFilter] = useState<AssetFilter>("ALL")
   const [active, setActive] = useState<Rfq | null>(null)
+  const { startChatFromQuote } = useChat()
 
   useEffect(() => {
     setRfqs(generateRfqs(18))
@@ -348,6 +386,26 @@ export function QuotesPanel({ scope = "token" }: { scope?: QuoteScope }) {
 
   const handleQuoted = (id: string) => {
     setRfqs((prev) => prev.filter((r) => r.id !== id))
+  }
+
+  // Intent-driven: open the sidebar and auto-send the trade context.
+  const handleChat = (rfq: Rfq) => {
+    startChatFromQuote({
+      peerAddress: rfq.requester,
+      quoteId: rfq.id,
+      inquiry: {
+        quoteId: rfq.id,
+        instrument: rfq.instrument,
+        side: rfq.side,
+        asset: rfq.asset,
+        quantity: rfq.quantity,
+        settlement: rfq.settlement,
+        proposedPrice: suggestUnitPrice(rfq),
+        strikeUsd: rfq.strikeUsd,
+        optionExpiry: rfq.optionExpiry,
+        note: `Following up on your ${rfq.asset} RFQ — happy to make you a market.`,
+      },
+    })
   }
 
   return (
@@ -389,7 +447,12 @@ export function QuotesPanel({ scope = "token" }: { scope?: QuoteScope }) {
           </div>
         ) : (
           filtered.map((r) => (
-            <RfqCard key={r.id} rfq={r} onClick={() => setActive(r)} />
+            <RfqCard
+              key={r.id}
+              rfq={r}
+              onClick={() => setActive(r)}
+              onChat={() => handleChat(r)}
+            />
           ))
         )}
       </div>
