@@ -8,6 +8,7 @@ import { WalletButton } from "@/components/wallet-button"
 import { Workspace } from "@/components/workspace"
 import { ChatProvider, useChat } from "@/components/chat/chat-context"
 import { ChatSidebar } from "@/components/chat/chat-sidebar"
+import { SettingsButton } from "@/components/settings-button"
 
 export type Category = "propamm" | "otc" | "options" | "lending"
 
@@ -92,6 +93,7 @@ function AppShellInner() {
           <div className="flex items-center gap-3">
             <ChatButton />
             <WalletButton />
+            <SettingsButton />
             <ThemeToggle />
           </div>
         </div>

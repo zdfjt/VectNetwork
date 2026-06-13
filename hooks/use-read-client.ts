@@ -2,32 +2,43 @@
 
 import { useMemo } from "react"
 import { usePublicClient, useWalletClient } from "wagmi"
-import { createPublicClient, custom, type PublicClient } from "viem"
+import { createPublicClient, custom, http, type PublicClient } from "viem"
+import { useCustomRpcUrl } from "@/lib/rpc-store"
 
 /**
  * Returns a viem PublicClient for read / eth_call operations.
  *
- * When a wallet is connected we route reads through the WALLET'S OWN RPC
- * (the provider injected by MetaMask / Coinbase / WalletConnect, i.e.
- * `walletClient.transport`) instead of any hardcoded RPC URL. This keeps the
- * app on whatever network/endpoint the user's wallet is actually pointed at.
+ * Priority order:
+ *  1. A user-supplied custom RPC URL (Node Configuration in Settings), if set.
+ *     Power users can point the app at their own node.
+ *  2. The CONNECTED WALLET'S OWN RPC (the provider injected by MetaMask /
+ *     Coinbase / WalletConnect, i.e. `walletClient.transport`).
+ *  3. wagmi's configured public client (before a wallet is connected).
  *
- * Falls back to wagmi's configured public client only when no wallet is
- * connected (e.g. initial render before the user connects).
+ * This keeps the app on whatever endpoint the user prefers while never
+ * relying on a hardcoded RPC URL in source.
  */
 export function useReadClient(): PublicClient | undefined {
   const fallbackClient = usePublicClient()
   const { data: walletClient } = useWalletClient()
+  const customRpcUrl = useCustomRpcUrl()
 
   return useMemo(() => {
+    // 1. Custom RPC URL takes precedence when provided.
+    if (customRpcUrl) {
+      return createPublicClient({
+        chain: walletClient?.chain ?? fallbackClient?.chain,
+        transport: http(customRpcUrl),
+      })
+    }
+    // 2. Derive a public client from the connected wallet's transport.
     if (walletClient) {
-      // Derive a public client from the connected wallet's transport so all
-      // eth_call / readContract traffic uses the wallet's RPC connection.
       return createPublicClient({
         chain: walletClient.chain,
         transport: custom(walletClient.transport),
       })
     }
+    // 3. Fall back to wagmi's configured client.
     return fallbackClient
-  }, [walletClient, fallbackClient])
+  }, [customRpcUrl, walletClient, fallbackClient])
 }
