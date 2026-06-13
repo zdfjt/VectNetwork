@@ -1,8 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { usePublicClient } from "wagmi"
 import { parseUnits } from "viem"
+import { useReadClient } from "@/hooks/use-read-client"
 import { PROPAMM_ROUTER_ABI, PROPAMM_ROUTER_ADDRESS } from "@/lib/propamm-router-abi"
 import {
   PROPAMM_VENUE_ADDRESSES,
@@ -55,7 +55,7 @@ export function usePropammQuote({
   amountIn,
   refreshMs = 12_000,
 }: UseQuoteArgs) {
-  const publicClient = usePublicClient()
+  const publicClient = useReadClient()
   const [status, setStatus] = useState<QuoteStatus>("idle")
   const [quote, setQuote] = useState<QuoteResult | null>(null)
   const [error, setError] = useState<string | null>(null)

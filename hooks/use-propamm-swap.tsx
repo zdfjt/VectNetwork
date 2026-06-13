@@ -1,12 +1,9 @@
 "use client"
 
 import { useCallback, useState } from "react"
-import {
-  useAccount,
-  usePublicClient,
-  useWalletClient,
-} from "wagmi"
+import { useAccount, useWalletClient } from "wagmi"
 import { parseUnits, decodeEventLog, type Hash } from "viem"
+import { useReadClient } from "@/hooks/use-read-client"
 import {
   PROPAMM_ROUTER_ABI,
   PROPAMM_ROUTER_ADDRESS,
@@ -50,7 +47,7 @@ const DEADLINE_SECONDS = 600 // 10 minutes
 
 export function usePropammSwap() {
   const { address } = useAccount()
-  const publicClient = usePublicClient()
+  const publicClient = useReadClient()
   const { data: walletClient } = useWalletClient()
 
   const [stage, setStage] = useState<SwapStage>("idle")
