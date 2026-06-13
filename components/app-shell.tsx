@@ -1,18 +1,20 @@
 "use client"
 
 import { useState } from "react"
-import { ArrowLeftRight, Coins, Layers, MessageSquare } from "lucide-react"
+import { ArrowLeftRight, Coins, Layers, MessageSquare, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { WalletButton } from "@/components/wallet-button"
 import { Workspace } from "@/components/workspace"
 import { ChatProvider, useChat } from "@/components/chat/chat-context"
 import { ChatSidebar } from "@/components/chat/chat-sidebar"
+import { SettingsButton } from "@/components/settings-button"
 
-export type Category = "spot" | "options" | "lending"
+export type Category = "propamm" | "otc" | "options" | "lending"
 
 const CATEGORIES: { id: Category; label: string; icon: typeof Coins }[] = [
-  { id: "spot", label: "Spot", icon: ArrowLeftRight },
+  { id: "propamm", label: "PropAMM", icon: Zap },
+  { id: "otc", label: "OTC", icon: ArrowLeftRight },
   { id: "options", label: "Options", icon: Layers },
   { id: "lending", label: "Lending", icon: Coins },
 ]
@@ -46,7 +48,7 @@ export function AppShell() {
 }
 
 function AppShellInner() {
-  const [category, setCategory] = useState<Category>("spot")
+  const [category, setCategory] = useState<Category>("propamm")
 
   return (
     <main className="min-h-screen bg-background">
@@ -91,6 +93,7 @@ function AppShellInner() {
           <div className="flex items-center gap-3">
             <ChatButton />
             <WalletButton />
+            <SettingsButton />
             <ThemeToggle />
           </div>
         </div>

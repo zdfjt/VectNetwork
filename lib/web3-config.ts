@@ -1,20 +1,19 @@
 import { createConfig } from "wagmi"
-import { mainnet, arbitrum } from "wagmi/chains"
+import { mainnet, arbitrum, sepolia } from "wagmi/chains"
 import { injected, metaMask, walletConnect, coinbaseWallet } from "wagmi/connectors"
 import { http } from "viem"
-// 生产环境用 custom(window.ethereum) 替换 http 以使用钱包注入的 provider
-// import { custom } from "viem"
-// const ethProvider = typeof window !== "undefined" ? (window as any).ethereum : undefined
 
-const sepolia = {
-  id: 31337,
-  name: "Sepolia",
-  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-  rpcUrls: {
-    default: { http: ["https://rpc.intentflow.trade/"] },
-    public: { http: ["https://rpc.intentflow.trade/"] },
-  },
-} as const
+/**
+ * NOTE on RPC usage:
+ * All on-chain reads (quoteV1 / quoteVenueV1 simulations) and writes (swapV1,
+ * approvals) go through the CONNECTED WALLET'S RPC via `useReadClient` /
+ * `useWalletClient`. We no longer hardcode a custom RPC endpoint here.
+ *
+ * The `http()` transports below (with no URL) only provide a sensible default
+ * public endpoint for the brief window before a wallet is connected. Once the
+ * user connects, the wallet's own provider becomes the source of truth for
+ * whichever network it is pointed at.
+ */
 
 declare module "wagmi" {
   interface Register {
@@ -23,7 +22,7 @@ declare module "wagmi" {
 }
 
 export const config = createConfig({
-  chains: [sepolia, mainnet, arbitrum],
+  chains: [mainnet, arbitrum, sepolia],
   connectors: [
     injected(),
     metaMask(),
@@ -33,12 +32,10 @@ export const config = createConfig({
     }),
   ],
   transports: {
-    [sepolia.id]: http("https://rpc.intentflow.trade/"),
-    [mainnet.id]: http("https://rpc.intentflow.trade/"),
-    [arbitrum.id]: http("https://rpc.intentflow.trade/"),
-    // 生产环境（正式上线）切换到 wallet 注入的 provider：
-    // [sepolia.id]: custom(ethProvider),
-    // [mainnet.id]: custom(ethProvider),
-    // [arbitrum.id]: custom(ethProvider),
+    // No hardcoded URL — defaults to each chain's public RPC. Reads/writes
+    // after wallet connection use the wallet's injected provider instead.
+    [mainnet.id]: http(),
+    [arbitrum.id]: http(),
+    [sepolia.id]: http(),
   },
 })
