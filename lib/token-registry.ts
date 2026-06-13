@@ -17,6 +17,22 @@ export interface ChainConfig {
 
 // ========== 在这里配置你的链和代币 ==========
 export const CHAINS: Record<number, ChainConfig> = {
+  1: {
+    chainId: 1,
+    name: "Ethereum",
+    dexAddress: "0x4ddf368080cd7946db5b459ad591c350158175e1",
+    tokens: [
+      { symbol: "ETH", name: "Ether", address: ETH_ADDRESS, decimals: 18, price: 3120.42 },
+      { symbol: "WETH", name: "Wrapped Ether", address: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", decimals: 18, price: 3120.42 },
+      { symbol: "USDC", name: "USD Coin", address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", decimals: 6, price: 1.0 },
+      { symbol: "USDT", name: "Tether USD", address: "0xdAC17F958D2ee523a2206206994597C13D831ec7", decimals: 6, price: 1.0 },
+      { symbol: "DAI", name: "Dai Stablecoin", address: "0x6B175474E89094C44Da98b954EedeAC495271d0F", decimals: 18, price: 1.0 },
+      { symbol: "WBTC", name: "Wrapped BTC", address: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599", decimals: 8, price: 64210.18 },
+      { symbol: "UNI", name: "Uniswap", address: "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984", decimals: 18, price: 7.85 },
+      { symbol: "LINK", name: "Chainlink", address: "0x514910771AF9Ca656af840dff83E8264EcF986CA", decimals: 18, price: 14.2 },
+      { symbol: "PEPE", name: "Pepe", address: "0x6982508145454Ce325dDbE47a25d4f3d2060356c", decimals: 18, price: 0.0000098 },
+    ],
+  },
   31337: {
     chainId: 31337,
     name: "Sepolia",
