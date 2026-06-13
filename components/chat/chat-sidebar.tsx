@@ -27,6 +27,8 @@ export function ChatSidebar() {
     messagesByTopic,
     selfAddress,
     sendText,
+    getPeerAddressByTopic,
+    getRoomIdByTopic,
   } = useChat()
 
   const [draft, setDraft] = useState("")
@@ -72,7 +74,13 @@ export function ChatSidebar() {
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </button>
-                <span className="font-mono">{shortAddr(activeConvo.peerAddress)}</span>
+                <span>
+                  <span className="font-mono">交易对手: {shortAddr(getPeerAddressByTopic(activeTopic ?? ""))}</span>
+                  <span className="ml-2 font-mono text-xs text-muted-foreground">房间号: {(() => {
+                    const roomId = getRoomIdByTopic(activeTopic ?? "")
+                    return roomId ? `${roomId.slice(0, 6)}…${roomId.slice(-4)}` : "Connecting…"
+                  })()}</span>
+                </span>
               </>
             ) : (
               <>

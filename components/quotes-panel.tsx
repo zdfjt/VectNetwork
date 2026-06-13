@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useChainId } from "wagmi"
 import { format } from "date-fns"
 import {
   ArrowDownLeft,
@@ -25,9 +26,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { formatUsd, formatAmount } from "@/lib/quotes"
-import { generateRfqs, RFQ_ASSETS, suggestUnitPrice, type Rfq } from "@/lib/rfqs"
+import { type Rfq, suggestUnitPrice } from "@/lib/rfqs"
 import type { TokenSymbol } from "@/lib/propamm-types"
 import { useChat } from "@/components/chat/chat-context"
+import { useQuoteStream } from "@/hooks/use-quote-stream"
+import { getTokensByChain, findTokenByAddress } from "@/lib/token-registry"
+import type { StreamMessage } from "@/lib/ws-client"
 
 type QuoteStage = "draft" | "submitting" | "done"
 type AssetFilter = TokenSymbol | "ALL"
@@ -131,7 +135,17 @@ function RfqCard({
               )}
             </div>
             <div className="text-xs text-muted-foreground">
-              {isOption ? "Option" : "Token"} RFQ · {rfq.requester}
+              {isOption ? "Option" : "Token"} RFQ ·{" "}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  navigator.clipboard.writeText(rfq.requester)
+                }}
+                className="font-mono hover:text-foreground"
+              >
+                {rfq.requester.slice(0, 6)}...{rfq.requester.slice(-4)}
+              </button>
             </div>
           </div>
         </div>
@@ -169,6 +183,12 @@ function RfqCard({
         </div>
       </div>
 
+      {rfq.message && (
+        <div className="text-xs text-muted-foreground italic line-clamp-2">
+          {rfq.message}
+        </div>
+      )}
+
       <div className="flex items-center justify-between border-t border-border pt-2.5 text-xs">
         <span className="flex items-center gap-1 text-muted-foreground">
           <Clock className="size-3" />
@@ -193,7 +213,7 @@ function RfqCard({
             expired && "cursor-not-allowed opacity-50",
           )}
         >
-          Submit quote
+          Response Quote
         </button>
         <button
           type="button"
@@ -293,12 +313,31 @@ function QuoteDialog({
         </DialogHeader>
 
         <div className="divide-y divide-border">
-          <DetailRow label="Requester" value={rfq.requester} />
+          <div className="flex items-center justify-between py-2">
+            <span className="text-sm text-muted-foreground">Requester</span>
+            <button
+              type="button"
+              onClick={() => navigator.clipboard.writeText(rfq.requester)}
+              className="cursor-pointer font-mono text-sm font-medium text-foreground hover:text-sky-400"
+            >
+              {rfq.requester}
+            </button>
+          </div>
           <DetailRow label="Your side" value={yourSide} mono={false} />
-          <DetailRow
-            label={isOption ? "Contracts" : "Quantity"}
-            value={`${formatAmount(rfq.quantity)} ${isOption ? "" : rfq.asset}`}
-          />
+          <div className="flex items-center justify-between py-2">
+            <span className="text-sm text-muted-foreground">
+              {isOption ? "Contracts" : "Quantity"}
+            </span>
+            <div
+              className="cursor-pointer text-right hover:text-sky-400"
+              onClick={() => rfq.assetAddress && !isOption && navigator.clipboard.writeText(rfq.assetAddress)}
+              title={!isOption && rfq.assetAddress ? rfq.assetAddress : ""}
+            >
+              <div className="text-sm font-medium text-foreground">
+                {formatAmount(rfq.quantity)} {isOption ? "" : rfq.asset}
+              </div>
+            </div>
+          </div>
           {isOption && (
             <>
               <DetailRow label="Strike price" value={formatUsd(rfq.strikeUsd ?? 0)} />
@@ -308,8 +347,23 @@ function QuoteDialog({
               />
             </>
           )}
-          <DetailRow label="Settlement" value={rfq.settlement} />
+          <div className="flex items-center justify-between py-2">
+            <span className="text-sm text-muted-foreground">Settlement</span>
+            <div
+              className="cursor-pointer text-right hover:text-sky-400"
+              onClick={() => rfq.settlementAddress && !isOption && navigator.clipboard.writeText(rfq.settlementAddress)}
+              title={!isOption && rfq.settlementAddress ? rfq.settlementAddress : ""}
+            >
+              <div className="text-sm font-medium text-foreground">{rfq.settlement}</div>
+            </div>
+          </div>
           <DetailRow label="Competing quotes" value={String(rfq.competingQuotes)} />
+          {rfq.message && (
+            <div className="py-2">
+              <span className="text-sm text-muted-foreground">Message</span>
+              <p className="mt-1 text-sm text-foreground">{rfq.message}</p>
+            </div>
+          )}
         </div>
 
         {stage === "draft" && (
@@ -367,14 +421,49 @@ function QuoteDialog({
 }
 
 export function QuotesPanel({ scope = "token" }: { scope?: QuoteScope }) {
+  const chainId = useChainId()
+  const tokens = useMemo(() => getTokensByChain(chainId), [chainId])
+  const { quotes: streamQuotes, connectionState } = useQuoteStream()
   const [rfqs, setRfqs] = useState<Rfq[]>([])
   const [assetFilter, setAssetFilter] = useState<AssetFilter>("ALL")
   const [active, setActive] = useState<Rfq | null>(null)
   const { startChatFromQuote } = useChat()
 
+  const assetList = useMemo(() => tokens.map((t) => t.symbol), [tokens])
+
+  // Map incoming WS messages to Rfq format
   useEffect(() => {
-    setRfqs(generateRfqs(18))
-  }, [])
+    if (streamQuotes.length === 0) return
+
+    const newRfqs: Rfq[] = streamQuotes.map((msg) => {
+      const payload = msg.parsedPayload
+      const assetInToken = payload ? findTokenByAddress(chainId, payload.assetSell) : undefined
+      const assetOutToken = payload ? findTokenByAddress(chainId, payload.assetBuy) : undefined
+
+      return {
+        id: msg.nonce,
+        requester: msg.maker,
+        makerAddress: msg.maker,
+        instrument: "token" as const,
+        side: "buy" as const,
+        asset: (assetInToken?.symbol ?? "WETH") as TokenSymbol,
+        assetAddress: payload?.assetSell,
+        quantity: payload ? Number(payload.amountSell) : 0,
+        rfqExpiry: msg.deadline * 1000,
+        createdAt: msg.receivedAt ?? Date.now(),
+        settlement: (assetOutToken?.symbol ?? "USDC") as TokenSymbol,
+        settlementAddress: payload?.assetBuy,
+        competingQuotes: 0,
+        message: payload?.message,
+      }
+    })
+
+    setRfqs((prev) => {
+      const existing = new Set(prev.map((r) => r.id))
+      const fresh = newRfqs.filter((r) => !existing.has(r.id))
+      return [...fresh, ...prev].slice(0, 50)
+    })
+  }, [streamQuotes, chainId])
 
   const filtered = useMemo(() => {
     return rfqs.filter((r) => {
@@ -391,7 +480,7 @@ export function QuotesPanel({ scope = "token" }: { scope?: QuoteScope }) {
   // Intent-driven: open the sidebar and auto-send the trade context.
   const handleChat = (rfq: Rfq) => {
     startChatFromQuote({
-      peerAddress: rfq.requester,
+      peerAddress: rfq.makerAddress ?? rfq.requester,
       quoteId: rfq.id,
       inquiry: {
         quoteId: rfq.id,
@@ -421,7 +510,7 @@ export function QuotesPanel({ scope = "token" }: { scope?: QuoteScope }) {
 
       {/* Asset filter */}
       <div className="mb-4 flex flex-wrap gap-1.5">
-        {(["ALL", ...RFQ_ASSETS] as AssetFilter[]).map((a) => (
+        {(["ALL", ...assetList] as AssetFilter[]).map((a) => (
           <button
             key={a}
             type="button"

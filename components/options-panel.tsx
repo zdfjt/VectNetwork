@@ -323,7 +323,7 @@ export function OptionsPanel() {
             Expiry
           </span>
           <Popover>
-            <PopoverTrigger asChild>
+            <PopoverTrigger>
               <span
                 role="button"
                 tabIndex={0}

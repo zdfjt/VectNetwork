@@ -4,14 +4,8 @@ import type { OrderDirection, OrderInstrument } from "./orders"
 /**
  * XMTP message model for the OTC desk.
  *
- * The transport layer is currently mocked (see `hooks/use-xmtp.ts`), but these
- * types are intentionally shaped to mirror the real `@xmtp/browser-sdk` (V3/MLS)
- * so the swap to a live client is mechanical.
- *
- * TODO(xmtp): When wiring the real SDK, the on-wire payload should be the
- * `content` string below. Use a custom XMTP ContentType
- * (e.g. `ContentTypeId { authorityId: "vectnetwork.xyz", typeId: "order-inquiry", ... }`)
- * or fall back to encoding this JSON inside a text message and parsing it on read.
+ * Uses real `@xmtp/browser-sdk` (v5) transport.
+ * Inquiry payloads are JSON-encoded as text messages.
  */
 
 /** The structured trade context attached to an "I want to chat about this RFQ" message. */

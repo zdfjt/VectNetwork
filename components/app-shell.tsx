@@ -4,6 +4,7 @@ import { useState } from "react"
 import { ArrowLeftRight, Coins, Layers, MessageSquare } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { WalletButton } from "@/components/wallet-button"
 import { Workspace } from "@/components/workspace"
 import { ChatProvider, useChat } from "@/components/chat/chat-context"
 import { ChatSidebar } from "@/components/chat/chat-sidebar"
@@ -89,12 +90,7 @@ function AppShellInner() {
 
           <div className="flex items-center gap-3">
             <ChatButton />
-            <button
-              type="button"
-              className="rounded-lg border border-border bg-secondary/60 px-3 py-1.5 font-mono text-xs text-foreground transition-colors hover:bg-secondary"
-            >
-              0x71C…4a2F
-            </button>
+            <WalletButton />
             <ThemeToggle />
           </div>
         </div>

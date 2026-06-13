@@ -3,12 +3,15 @@ import type { OptionLeg, OrderDirection, OrderInstrument } from "./orders"
 
 export interface Rfq {
   id: string
-  // who requested the quote
+  // who requested the quote (truncated for display)
   requester: string
+  // full wallet address for XMTP operations
+  makerAddress?: string
   instrument: OrderInstrument
   // the side the requester wants to take (you quote the opposite)
   side: OrderDirection
   asset: TokenSymbol
+  assetAddress?: string
   // quantity of tokens or number of option contracts
   quantity: number
   // option-specific attributes (no price — that's what you quote)
@@ -20,8 +23,11 @@ export interface Rfq {
   createdAt: number
   // settlement asset
   settlement: TokenSymbol
+  settlementAddress?: string
   // how many makers have already quoted
   competingQuotes: number
+  // human-readable intent message
+  message?: string
 }
 
 const REQUESTERS = [

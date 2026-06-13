@@ -1,10 +1,11 @@
-export type TokenSymbol = "ETH" | "USDC" | "WBTC" | "DAI" | "SOL" | "ARB"
+export type TokenSymbol = "ETH" | "USDC" | "WBTC" | "DAI" | "SOL" | "ARB" | "USDT" | "WETH"
 
 export interface Token {
-  symbol: TokenSymbol
+  symbol: TokenSymbol | string
   name: string
-  // approximate USD reference price, used for mock quote math
   price: number
+  address?: string
+  decimals?: number
 }
 
 export const TOKENS: Token[] = [
@@ -16,7 +17,7 @@ export const TOKENS: Token[] = [
   { symbol: "ARB", name: "Arbitrum", price: 0.92 },
 ]
 
-export function getToken(symbol: TokenSymbol): Token {
+export function getToken(symbol: string): Token {
   return TOKENS.find((t) => t.symbol === symbol) ?? TOKENS[0]
 }
 

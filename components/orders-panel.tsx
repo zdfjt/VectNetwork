@@ -1,17 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { format } from "date-fns"
-import {
-  ArrowDownLeft,
-  ArrowUpRight,
-  Check,
-  Clock,
-  Layers,
-  Loader2,
-  TrendingDown,
-  TrendingUp,
-} from "lucide-react"
+import { Check, Clock, Layers, Loader2 } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -20,16 +11,12 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { formatUsd, formatAmount } from "@/lib/quotes"
-import {
-  generateOpenOrders,
-  ORDER_ASSETS,
-  type OpenOrder,
-} from "@/lib/orders"
-import type { TokenSymbol } from "@/lib/propamm-types"
+import { useQuoteStream } from "@/hooks/use-quote-stream"
+import { findTokenByAddress } from "@/lib/token-registry"
+import type { StreamMessage } from "@/lib/ws-client"
+import { useChainId } from "wagmi"
 
 type FillStage = "review" | "signing" | "done"
-type AssetFilter = TokenSymbol | "ALL"
 type OrderScope = "token" | "option"
 
 function useCountdown(target: number) {
@@ -48,36 +35,20 @@ function useCountdown(target: number) {
   return { expired: ms <= 0, label }
 }
 
-function DirectionBadge({ direction }: { direction: OpenOrder["direction"] }) {
-  const isBuy = direction === "buy"
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide",
-        isBuy
-          ? "bg-emerald-500/15 text-emerald-400"
-          : "bg-rose-500/15 text-rose-400",
-      )}
-    >
-      {isBuy ? (
-        <ArrowDownLeft className="size-3" />
-      ) : (
-        <ArrowUpRight className="size-3" />
-      )}
-      {direction}
-    </span>
-  )
-}
-
-function OrderCard({
-  order,
+function StreamOrderCard({
+  msg,
   onClick,
 }: {
-  order: OpenOrder
+  msg: StreamMessage
   onClick: () => void
 }) {
-  const { expired, label } = useCountdown(order.orderExpiry)
-  const isOption = order.instrument === "option"
+  const chainId = useChainId()
+  const payload = msg.parsedPayload
+  const assetSellToken = payload ? findTokenByAddress(chainId, payload.assetSell) : undefined
+  const assetBuyToken = payload ? findTokenByAddress(chainId, payload.assetBuy) : undefined
+  const assetSellSym = assetSellToken?.symbol ?? payload?.assetSell.slice(0, 6) ?? "?"
+  const assetBuySym = assetBuyToken?.symbol ?? payload?.assetBuy.slice(0, 6) ?? "?"
+  const { expired, label } = useCountdown(msg.deadline * 1000)
 
   return (
     <button
@@ -93,86 +64,42 @@ function OrderCard({
     >
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2.5">
-          <div
-            className={cn(
-              "flex size-9 items-center justify-center rounded-lg",
-              isOption ? "bg-sky-500/15 text-sky-400" : "bg-secondary text-foreground",
-            )}
-          >
-            {isOption ? (
-              <Layers className="size-4" />
-            ) : (
-              <span className="font-mono text-xs font-bold">{order.asset.slice(0, 2)}</span>
-            )}
+          <div className="flex size-9 items-center justify-center rounded-lg bg-secondary text-foreground">
+            <span className="font-mono text-xs font-bold">{assetSellSym.slice(0, 2)}</span>
           </div>
           <div className="leading-tight">
             <div className="flex items-center gap-1.5 font-semibold text-foreground">
-              {order.asset}
-              {isOption && (
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-0.5 text-xs font-medium",
-                    order.optionLeg === "call" ? "text-emerald-400" : "text-rose-400",
-                  )}
-                >
-                  {order.optionLeg === "call" ? (
-                    <TrendingUp className="size-3" />
-                  ) : (
-                    <TrendingDown className="size-3" />
-                  )}
-                  {order.optionLeg === "call" ? "Call" : "Put"}
-                </span>
-              )}
+              Sell {payload?.amountSell} {assetSellSym}
             </div>
             <div className="text-xs text-muted-foreground">
-              {isOption ? "Option" : "Token"} · {order.maker}
+              Buy {payload?.amountBuy} {assetBuySym} · {msg.maker.slice(0, 6)}...{msg.maker.slice(-4)}
             </div>
           </div>
         </div>
-        <DirectionBadge direction={order.direction} />
       </div>
 
-      <div className="grid grid-cols-3 gap-2 text-sm">
-        <div>
-          <div className="text-xs text-muted-foreground">
-            {isOption ? "Contracts" : "Quantity"}
-          </div>
-          <div className="font-medium tabular-nums text-foreground">
-            {formatAmount(order.quantity)}
-          </div>
+      {payload?.message && (
+        <div className="text-xs text-muted-foreground italic line-clamp-2">
+          {payload.message}
         </div>
-        <div>
-          <div className="text-xs text-muted-foreground">
-            {isOption ? "Strike" : "Unit price"}
-          </div>
-          <div className="font-medium tabular-nums text-foreground">
-            {isOption ? formatUsd(order.strikeUsd ?? 0) : formatUsd(order.unitPriceUsd)}
-          </div>
-        </div>
-        <div>
-          <div className="text-xs text-muted-foreground">Order value</div>
-          <div className="font-semibold tabular-nums text-foreground">
-            {formatUsd(order.notionalUsd)}
-          </div>
-        </div>
-      </div>
+      )}
 
       <div className="flex items-center justify-between border-t border-border pt-2.5 text-xs">
         <span className="flex items-center gap-1 text-muted-foreground">
           <Clock className="size-3" />
           {expired ? "Expired" : `Expires in ${label}`}
         </span>
-        {isOption && order.optionExpiry && (
-          <span className="text-muted-foreground">
-            Exp {format(order.optionExpiry, "dd MMM")}
-          </span>
-        )}
+        <span className="text-muted-foreground">
+          {payload?.taker && payload.taker !== "0x0000000000000000000000000000000000000000"
+            ? `Taker: ${payload.taker.slice(0, 6)}...${payload.taker.slice(-4)}`
+            : "Public order"}
+        </span>
       </div>
     </button>
   )
 }
 
-function OrderDetailRow({
+function DetailRow({
   label,
   value,
   mono = true,
@@ -191,96 +118,103 @@ function OrderDetailRow({
   )
 }
 
-function OrderDetailDialog({
-  order,
+function StreamOrderDialog({
+  msg,
   onClose,
-  onFilled,
 }: {
-  order: OpenOrder | null
+  msg: StreamMessage | null
   onClose: () => void
-  onFilled: (id: string) => void
 }) {
+  const chainId = useChainId()
   const [stage, setStage] = useState<FillStage>("review")
 
   useEffect(() => {
-    if (order) setStage("review")
-  }, [order])
+    if (msg) setStage("review")
+  }, [msg])
 
-  if (!order) return null
+  if (!msg) return null
 
-  const isOption = order.instrument === "option"
-  // taker takes the opposite side of the maker
-  const takerAction = order.direction === "buy" ? "Sell to maker" : "Buy from maker"
+  const payload = msg.parsedPayload
+  const assetSellToken = payload ? findTokenByAddress(chainId, payload.assetSell) : undefined
+  const assetBuyToken = payload ? findTokenByAddress(chainId, payload.assetBuy) : undefined
+  const assetSellSym = assetSellToken?.symbol ?? payload?.assetSell.slice(0, 6) ?? "?"
+  const assetBuySym = assetBuyToken?.symbol ?? payload?.assetBuy.slice(0, 6) ?? "?"
+  const isPrivate =
+    payload?.taker && payload.taker !== "0x0000000000000000000000000000000000000000"
 
   const handleSign = () => {
     setStage("signing")
     setTimeout(() => {
       setStage("done")
       setTimeout(() => {
-        onFilled(order.id)
         onClose()
       }, 1600)
     }, 1800)
   }
 
   return (
-    <Dialog open={!!order} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={!!msg} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <span>{order.asset}</span>
-            {isOption ? (
-              <span
-                className={cn(
-                  "text-sm font-medium",
-                  order.optionLeg === "call" ? "text-emerald-400" : "text-rose-400",
-                )}
-              >
-                {order.optionLeg === "call" ? "Call Option" : "Put Option"}
-              </span>
-            ) : (
-              <span className="text-sm font-medium text-muted-foreground">
-                Spot Token
-              </span>
-            )}
-            <DirectionBadge direction={order.direction} />
+            <span className="text-sm font-medium text-foreground">Order Detail</span>
           </DialogTitle>
         </DialogHeader>
 
         <div className="divide-y divide-border">
-          <OrderDetailRow label="Maker" value={order.maker} />
-          <OrderDetailRow label="Your side" value={takerAction} mono={false} />
-          <OrderDetailRow
-            label={isOption ? "Contracts" : "Quantity"}
-            value={`${formatAmount(order.quantity)} ${isOption ? "" : order.asset}`}
-          />
-          {isOption && (
-            <>
-              <OrderDetailRow label="Strike price" value={formatUsd(order.strikeUsd ?? 0)} />
-              <OrderDetailRow
-                label="Premium / contract"
-                value={formatUsd(order.unitPriceUsd)}
-              />
-              <OrderDetailRow
-                label="Option expiry"
-                value={order.optionExpiry ? format(order.optionExpiry, "dd MMM yyyy") : "—"}
-              />
-            </>
-          )}
-          {!isOption && (
-            <OrderDetailRow label="Unit price" value={formatUsd(order.unitPriceUsd)} />
-          )}
-          <OrderDetailRow label="Settlement" value={order.settlement} />
-          <OrderDetailRow
-            label="Order expires"
-            value={format(order.orderExpiry, "dd MMM HH:mm")}
-          />
-          <div className="flex items-center justify-between py-3">
-            <span className="text-sm font-medium text-foreground">Total value</span>
-            <span className="text-lg font-bold tabular-nums text-foreground">
-              {formatUsd(order.notionalUsd)}
-            </span>
+          <div className="flex items-center justify-between py-2">
+            <span className="text-sm text-muted-foreground">Maker</span>
+            <button
+              type="button"
+              onClick={() => navigator.clipboard.writeText(msg.maker)}
+              className="cursor-pointer font-mono text-sm font-medium text-foreground hover:text-sky-400"
+            >
+              {msg.maker}
+            </button>
           </div>
+          <div className="flex items-center justify-between py-2">
+            <span className="text-sm text-muted-foreground">Want Sell</span>
+            <div
+              className="cursor-pointer text-right hover:text-sky-400"
+              onClick={() => payload?.assetSell && navigator.clipboard.writeText(payload.assetSell)}
+              title={payload?.assetSell ?? ""}
+            >
+              <div className="text-sm font-medium text-foreground">
+                {payload?.amountSell ?? "?"} {assetSellSym}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center justify-between py-2">
+            <span className="text-sm text-muted-foreground">Want Buy</span>
+            <div
+              className="cursor-pointer text-right hover:text-sky-400"
+              onClick={() => payload?.assetBuy && navigator.clipboard.writeText(payload.assetBuy)}
+              title={payload?.assetBuy ?? ""}
+            >
+              <div className="text-sm font-medium text-foreground">
+                {payload?.amountBuy ?? "?"} {assetBuySym}
+              </div>
+            </div>
+          </div>
+          <DetailRow
+            label="Expiry"
+            value={format(msg.deadline * 1000, "dd MMM yyyy HH:mm")}
+          />
+          <DetailRow
+            label="Taker"
+            value={
+              isPrivate
+                ? `${payload!.taker.slice(0, 8)}...${payload!.taker.slice(-6)}`
+                : "Public (anyone can take)"
+            }
+            mono={false}
+          />
+          {payload?.message && (
+            <div className="py-2">
+              <span className="text-sm text-muted-foreground">Message</span>
+              <p className="mt-1 text-sm text-foreground">{payload.message}</p>
+            </div>
+          )}
         </div>
 
         {stage === "review" && (
@@ -289,7 +223,7 @@ function OrderDetailDialog({
             onClick={handleSign}
             className="h-12 w-full bg-sky-500 text-base font-semibold text-sky-950 hover:bg-sky-400"
           >
-            Confirm & Sign Transaction
+            Take Order
           </Button>
         )}
         {stage === "signing" && (
@@ -316,25 +250,10 @@ function OrderDetailDialog({
 }
 
 export function OrdersPanel({ scope = "token" }: { scope?: OrderScope }) {
-  const [orders, setOrders] = useState<OpenOrder[]>([])
-  const [assetFilter, setAssetFilter] = useState<AssetFilter>("ALL")
-  const [active, setActive] = useState<OpenOrder | null>(null)
+  const { orders: streamOrders } = useQuoteStream()
+  const [active, setActive] = useState<StreamMessage | null>(null)
 
-  useEffect(() => {
-    setOrders(generateOpenOrders(18))
-  }, [])
-
-  const filtered = useMemo(() => {
-    return orders.filter((o) => {
-      if (o.instrument !== scope) return false
-      if (assetFilter !== "ALL" && o.asset !== assetFilter) return false
-      return true
-    })
-  }, [orders, assetFilter, scope])
-
-  const handleFilled = (id: string) => {
-    setOrders((prev) => prev.filter((o) => o.id !== id))
-  }
+  const showOrders = scope === "token" && streamOrders.length > 0
 
   return (
     <div className="flex h-full flex-col rounded-xl border border-border bg-card p-5">
@@ -343,47 +262,30 @@ export function OrdersPanel({ scope = "token" }: { scope?: OrderScope }) {
           {scope === "option" ? "Option Orders" : "Token Orders"}
         </h2>
         <span className="font-mono text-xs text-muted-foreground">
-          {filtered.length} fillable
+          {showOrders ? streamOrders.length : 0} fillable
         </span>
       </div>
 
-      {/* Asset filter */}
-      <div className="mb-4 flex flex-wrap gap-1.5">
-        {(["ALL", ...ORDER_ASSETS] as AssetFilter[]).map((a) => (
-          <button
-            key={a}
-            type="button"
-            onClick={() => setAssetFilter(a)}
-            className={cn(
-              "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-              assetFilter === a
-                ? "border-sky-500/60 bg-sky-500/10 text-sky-400"
-                : "border-border bg-secondary/40 text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {a === "ALL" ? "All assets" : a}
-          </button>
-        ))}
-      </div>
-
-      {/* Order list */}
       <div className="terminal-scroll -mr-2 flex-1 space-y-2.5 overflow-y-auto pr-2">
-        {filtered.length === 0 ? (
+        {!showOrders ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
             <Layers className="size-6 opacity-40" />
-            No open orders match your filters
+            No open orders
           </div>
         ) : (
-          filtered.map((o) => (
-            <OrderCard key={o.id} order={o} onClick={() => setActive(o)} />
+          streamOrders.map((msg) => (
+            <StreamOrderCard
+              key={msg.nonce}
+              msg={msg}
+              onClick={() => setActive(msg)}
+            />
           ))
         )}
       </div>
 
-      <OrderDetailDialog
-        order={active}
+      <StreamOrderDialog
+        msg={active}
         onClose={() => setActive(null)}
-        onFilled={handleFilled}
       />
     </div>
   )
