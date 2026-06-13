@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import type { Category } from "@/components/app-shell"
 import { SwapPanel } from "@/components/swap-panel"
+import { PropammPanel } from "@/components/propamm/propamm-panel"
 import { OptionsPanel } from "@/components/options-panel"
 import { LendingPanel } from "@/components/lending-panel"
 import { OrdersPanel } from "@/components/orders-panel"
@@ -27,10 +28,15 @@ export function Workspace({ category }: { category: Category }) {
     setTab("trade")
   }, [category])
 
+  // PropAMM is a single aggregator view with no orders/quotes sub-tabs.
+  const isPropamm = category === "propamm"
   const isTrade = tab === "trade"
 
   function renderPanel() {
-    if (category === "spot") {
+    if (category === "propamm") {
+      return <PropammPanel />
+    }
+    if (category === "otc") {
       if (tab === "trade") return <SwapPanel />
       if (tab === "orders") return <OrdersPanel scope="token" />
       return <QuotesPanel scope="token" />
@@ -48,26 +54,28 @@ export function Workspace({ category }: { category: Category }) {
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
-      {/* Sub-tab switch */}
-      <nav className="mb-6 flex items-center gap-1 rounded-lg border border-border bg-secondary/40 p-1 sm:w-fit">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={cn(
-              "flex-1 rounded-md px-4 py-1.5 text-xs font-medium transition-colors sm:flex-none",
-              tab === t.id
-                ? "bg-sky-500/15 text-sky-400"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </nav>
+      {/* Sub-tab switch — hidden for the PropAMM aggregator view */}
+      {!isPropamm && (
+        <nav className="mb-6 flex items-center gap-1 rounded-lg border border-border bg-secondary/40 p-1 sm:w-fit">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={cn(
+                "flex-1 rounded-md px-4 py-1.5 text-xs font-medium transition-colors sm:flex-none",
+                tab === t.id
+                  ? "bg-sky-500/15 text-sky-400"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </nav>
+      )}
 
-      {isTrade ? (
+      {isPropamm || isTrade ? (
         <div className="mx-auto max-w-md">
           <section>{renderPanel()}</section>
         </div>
